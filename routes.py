@@ -11,6 +11,9 @@ class UserCredentials(BaseModel):
 
 @router.post("/fetch-user-data")
 def fetch_user_data(credentials: UserCredentials):
+    """
+    사용자 데이터를 가져오는 엔드포인트
+    """
     try:
         session = login_to_piugame(credentials.username, credentials.password)
 
@@ -29,6 +32,9 @@ def fetch_user_data(credentials: UserCredentials):
 
 @router.post("/fetch-pumbility-data")
 def fetch_pumbility_data(credentials: UserCredentials):
+    """
+    Pumbility 데이터를 가져오는 엔드포인트
+    """
     try:
         session = login_to_piugame(credentials.username, credentials.password)
 

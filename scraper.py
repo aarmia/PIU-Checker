@@ -1,9 +1,9 @@
 from bs4 import BeautifulSoup
 
+# 기존 사용자 데이터 스크래핑
 def parse_user_data(html_content):
     soup = BeautifulSoup(html_content, 'html.parser')
 
-    # 사용자 프로필 정보 추출
     user_data = {
         "level": soup.select_one(".subProfile_wrap .t1.en.col2").text.strip() if soup.select_one(".subProfile_wrap .t1.en.col2") else "Unknown",
         "nickname": soup.select_one(".subProfile_wrap .t2.en").text.strip() if soup.select_one(".subProfile_wrap .t2.en") else "Unknown",
@@ -18,7 +18,6 @@ def parse_user_data(html_content):
         "points": soup.select_one(".profile_etc .tt.en").text.strip() if soup.select_one(".profile_etc .tt.en") else "0"
     }
 
-    # 플레이 데이터 추출
     play_data = {
         "play_count": (
             soup.find("div", text="Play Count").find_next("i", class_="t2").text.strip()
@@ -33,3 +32,35 @@ def parse_user_data(html_content):
     }
 
     return {"user_data": user_data, "play_data": play_data}
+
+# 새로 추가된 PUMBILITY 데이터 스크래핑
+def parse_pumbility_data(html_content):
+    soup = BeautifulSoup(html_content, "html.parser")
+
+    main_pumbility = {
+        "total_score": soup.select_one(".pumbility_total_wrap .t2.en").text.strip()
+        if soup.select_one(".pumbility_total_wrap .t2.en") else "Unknown",
+        "description": soup.select_one(".memo_wrap2.st3 .ti").text.strip()
+        if soup.select_one(".memo_wrap2.st3 .ti") else "Unknown"
+    }
+
+    song_list = []
+    song_items = soup.select(".pumbility_list .list > li")
+    for song in song_items:
+        song_data = {
+            "song_name": song.select_one(".t1").text.strip() if song.select_one(".t1") else "Unknown",
+            "artist": song.select_one(".t2").text.strip() if song.select_one(".t2") else "Unknown",
+            "score": song.select_one(".score .tt.en").text.strip() if song.select_one(".score .tt.en") else "Unknown",
+            "play_date": song.select_one(".date .tt").text.strip() if song.select_one(".date .tt") else "Unknown",
+            "thumbnail_url": (
+                song.select_one(".profile_img .re")["style"].split("url('")[1].split("')")[0]
+                if song.select_one(".profile_img .re") and "url('" in song.select_one(".profile_img .re")["style"]
+                else "Unknown"
+            )
+        }
+        song_list.append(song_data)
+
+    return {
+        "main_pumbility": main_pumbility,
+        "song_list": song_list
+    }

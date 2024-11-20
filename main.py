@@ -1,6 +1,6 @@
 import requests
 from bs4 import BeautifulSoup
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel
 
 app = FastAPI()
@@ -100,7 +100,7 @@ def parse_user_data(html_content):
 
 # FastAPI 엔드포인트
 @app.post("/fetch-user-data")
-def fetch_user_data(credentials: UserCredentials):
+def fetch_user_data(credentials: UserCredentials, level: int = Query(None, title="레벨", description="특정 레벨 데이터를 가져옵니다.")):
     try:
         # 로그인 및 세션 생성
         session = login_to_piugame(credentials.username, credentials.password)
@@ -108,9 +108,11 @@ def fetch_user_data(credentials: UserCredentials):
         if not session:
             raise HTTPException(status_code=401, detail="로그인 실패")
 
-        # 보호된 페이지 요청
-        protected_url = "https://www.piugame.com/my_page/play_data.php"
-        response = session.get(protected_url, verify=False, timeout=30)
+        # 보호된 페이지 요청 URL
+        base_url = "https://www.piugame.com/my_page/play_data.php"
+        target_url = f"{base_url}?lv={level}" if level else base_url
+
+        response = session.get(target_url, verify=False, timeout=30)
 
         # 디버깅: 응답 URL과 상태 코드 확인
         print("최종 URL:", response.url)

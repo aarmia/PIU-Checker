@@ -1,4 +1,6 @@
-import re
+import time
+
+import requests
 from bs4 import BeautifulSoup
 
 def fetch_page_content(url, cookies=None):
@@ -80,6 +82,83 @@ def fetch_all_levels_data(session, base_url):
         }
 
     return level_data
+
+
+def fetch_song_details_for_level(session: requests.Session, level: int):
+    base_url = "https://www.piugame.com/my_page/my_best_score.php"
+    song_data = {"single": [], "double": []}
+    page = 1
+
+    while True:
+        print(f"Fetching page {page} for level {level}...")
+        url = f"{base_url}?lv={level}&&page={page}"
+        response = session.get(url, verify=False, timeout=30)
+        response.raise_for_status()
+
+        soup = BeautifulSoup(response.text, "html.parser")
+
+        # 곡 정보를 포함하는 리스트 선택
+        song_items = soup.select(".my_best_scoreList li")
+        if not song_items:
+            break  # 더 이상 곡 정보가 없으면 종료
+
+        for index, song in enumerate(song_items):
+            try:
+                # 곡 이름 확인
+                name_element = song.select_one(".song_name p")
+                if not name_element:
+                    continue
+                song_name = name_element.text.strip()
+
+                # 점수 확인
+                score_element = song.select_one(".txt_v .num")
+                if not score_element:
+                    print(f"Skipping item {index}: score not found")
+                    continue
+                score_text = score_element.text.strip().replace(",", "")
+                score = int(score_text)
+                formatted_score = (
+                    f"{score / 10000:.1f}" if score < 1000000 else f"{score // 10000}"
+                )
+
+                # 스코어가 0인 경우 생략
+                if formatted_score == "0.0":
+                    print(f"Skipping item {index}: score is 0")
+                    continue
+
+                # 곡 타입 확인
+                type_element = song.select_one(".stepBall_img_wrap .tw img")
+                if not type_element:
+                    print(f"Skipping item {index}: type information not found")
+                    continue
+                type_url = type_element.get("src", "")
+                song_type = "double" if "d_text" in type_url else "single"
+
+                # 결과 저장
+                song_data[song_type].append(
+                    {
+                        "name": song_name,
+                        "score": float(formatted_score),
+                    }
+                )
+
+            except Exception as e:
+                print(f"Error parsing song item at index {index}: {e}")
+
+        next_page = soup.select_one(".board_paging .xi.next")
+        if not next_page:
+            print("No more items found")
+            break
+
+        page += 1
+        time.sleep(1)
+
+    # 점수 기준 내림차순 정렬
+    song_data["single"].sort(key=lambda x: x["score"], reverse=True)
+    song_data["double"].sort(key=lambda x: x["score"], reverse=True)
+
+    return song_data
+
 
 
 def extract_plate_grade(item):

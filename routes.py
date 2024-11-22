@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from login import login_to_piugame
-from scraper import parse_user_data, extract_pumbility_score_and_songs
+from scraper import parse_user_data, extract_pumbility_score_and_songs, fetch_all_levels_data
 
 router = APIRouter()
 
@@ -25,6 +25,25 @@ def fetch_user_data(credentials: UserCredentials):
 
         parsed_data = parse_user_data(response.text)
         return {"status": "success", "data": parsed_data}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/fetch-all-levels-data")
+def fetch_all_levels_data_endpoint(credentials: UserCredentials):
+    """
+    모든 레벨 데이터를 수집하여 반환하는 엔드포인트
+    """
+    try:
+        session = login_to_piugame(credentials.username, credentials.password)
+
+        if not session:
+            raise HTTPException(status_code=401, detail="로그인 실패")
+
+        base_url = "https://www.piugame.com/my_page/play_data.php"
+        all_levels_data = fetch_all_levels_data(session, base_url)
+
+        return {"status": "success", "data": all_levels_data}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

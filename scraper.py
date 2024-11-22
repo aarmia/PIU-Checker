@@ -51,6 +51,37 @@ def parse_user_data(html_content):
     return {"user_data": user_data, "play_data": play_data}
 
 
+def fetch_all_levels_data(session, base_url):
+    """
+    모든 레벨(10~27over)의 데이터를 수집하여 반환
+    """
+    levels = list(range(10, 27)) + ["27over"]
+    level_data = {}
+
+    for level in levels:
+        # URL 생성
+        url = f"{base_url}?lv={level}" if level != "27over" else f"{base_url}?lv=27over"
+
+        # 레벨별 페이지 요청
+        response = session.get(url, verify=False, timeout=30)
+        response.raise_for_status()
+
+        # HTML 파싱
+        soup = BeautifulSoup(response.text, 'html.parser')
+
+        # 데이터 추출
+        rating = soup.select_one(".play_data_wrap .num.fontSt")
+        clear_data = soup.select_one(".clear_w .t1")
+
+        # 레벨 데이터 저장
+        level_data[level] = {
+            "rating": rating.text.strip() if rating else "0",
+            "clear_data": clear_data.text.strip() if clear_data else "0"
+        }
+
+    return level_data
+
+
 def extract_plate_grade(item):
     """
     Plate 정보를 추출하고, 등급 정보를 반환.
@@ -73,9 +104,6 @@ def extract_plate_grade(item):
     else:
         grade = image_filename.replace(".png", "").upper()
         return grade
-
-
-
 
 
 def extract_pumbility_score_and_songs(html_content):

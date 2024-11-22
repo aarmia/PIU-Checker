@@ -1,6 +1,10 @@
 import requests
+import urllib3
 from bs4 import BeautifulSoup
 from fastapi import HTTPException
+
+# HTTPS 경고 메시지 비활성화
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 def login_to_piugame(username: str, password: str):
     login_url = "https://www.piugame.com/bbs/login_check.php"

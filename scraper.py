@@ -19,8 +19,8 @@ def parse_user_data(html_content):
     """
     soup = BeautifulSoup(html_content, 'html.parser')
     user_data = {
-        "level": soup.select_one(".subProfile_wrap .t1.en.col2").text.strip()
-        if soup.select_one(".subProfile_wrap .t1.en.col2") else "Unknown",
+        "level": soup.select_one(".subProfile_wrap .t1.en").text.strip()
+        if soup.select_one(".subProfile_wrap .t1.en") else "Unknown",
         "nickname": soup.select_one(".subProfile_wrap .t2.en").text.strip()
         if soup.select_one(".subProfile_wrap .t2.en") else "Unknown",
         "last_login_date": (
@@ -220,3 +220,65 @@ def extract_pumbility_score_and_songs(html_content):
         "pumbility_score": pumbility_score,
         "song_list": song_list
     }
+
+
+def fetch_recently_played_data(html_content):
+    """
+    최근 플레이한 기록 데이터를 HTML에서 스크래핑하여 반환
+    """
+    soup = BeautifulSoup(html_content, "html.parser")
+    songs = []
+
+    song_items = soup.select(".recently_playeList > li")
+    for item in song_items:
+        try:
+            # 곡 제목
+            song_name = item.select_one(".song_name p").text.strip()
+
+            # 플레이 스코어
+            score_element = item.select_one(".li_in.ac .tx")
+            score = score_element.text.strip() if score_element else "0"
+
+            # 난이도
+            level_imgs = item.select(".stepBall_in .numw .imG img")
+            difficulty = "".join(
+                [img["alt"].replace("d_num_", "").replace(".png", "") for img in level_imgs]
+            )
+
+            # 곡 타입
+            type_img = item.select_one(".stepBall_in .tw img")
+            song_type = "double" if "d_text" in type_img["src"] else "single"
+
+            # 판정 정보
+            judgement_table = item.select(".board_st.ac.recently_play tbody tr td .tx")
+            judgement_info = {
+                "perfect": judgement_table[0].text.strip() if len(judgement_table) > 0 else "0",
+                "great": judgement_table[1].text.strip() if len(judgement_table) > 1 else "0",
+                "good": judgement_table[2].text.strip() if len(judgement_table) > 2 else "0",
+                "bad": judgement_table[3].text.strip() if len(judgement_table) > 3 else "0",
+                "miss": judgement_table[4].text.strip() if len(judgement_table) > 4 else "0",
+            }
+
+            # 플레이트 이미지 URL
+            plate_img = item.select_one(".li_in.st1 img")
+            plate_url = plate_img["src"] if plate_img else "STAGE BREAK"
+
+            # 곡 배경 URL
+            background_style = item.select_one(".wrap_in .in.bgfix")["style"]
+            background_url = background_style.split("url('")[1].split("')")[0]
+
+            # 데이터 추가
+            songs.append({
+                "song_name": song_name,
+                "score": score,
+                "difficulty": difficulty,
+                "type": song_type,
+                "judgement": judgement_info,
+                "plate_url": plate_url,
+                "background_url": background_url,
+            })
+        except Exception as e:
+            print(f"Error parsing song item: {e}")
+
+    return songs
+

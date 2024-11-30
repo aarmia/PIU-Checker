@@ -5,7 +5,7 @@ from scraper import (
     parse_user_data,
     extract_pumbility_score_and_songs,
     fetch_all_levels_data,
-    fetch_song_details_for_level
+    fetch_song_details_for_level, fetch_recently_played_data,
 )
 
 router = APIRouter()
@@ -90,5 +90,24 @@ def fetch_pumbility_data(credentials: UserCredentials):
         parsed_data = extract_pumbility_score_and_songs(response.text)
         return {"status": "success", "data": parsed_data}
 
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/fetch-recently-played")
+def fetch_recently_played_endpoint(credentials: UserCredentials):
+    """
+    최근 플레이한 기록 데이터를 가져오는 엔드포인트
+    """
+    try:
+        session = login_to_piugame(credentials.username, credentials.password)
+
+        if not session:
+            raise HTTPException(status_code=401, detail="로그인 실패")
+
+        recently_played_url = "https://www.piugame.com/my_page/recently_played.php"
+        response = session.get(recently_played_url, verify=False, timeout=30)
+
+        data = fetch_recently_played_data(response.text)
+        return {"status": "success", "data": data}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

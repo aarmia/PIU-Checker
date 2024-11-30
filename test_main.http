@@ -1,11 +1,55 @@
 # Test your FastAPI endpoints
 
-GET http://127.0.0.1:8000/
-Accept: application/json
+# Fetch User Data
+POST http://localhost:8000/fetch-user-data
+Content-Type: application/json
+
+{
+  "username": "test_user",
+  "password": "test_password"
+}
 
 ###
 
-GET http://127.0.0.1:8000/hello/User
-Accept: application/json
+# Fetch All Levels Data
+POST http://localhost:8000/fetch-all-levels-data
+Content-Type: application/json
+
+{
+  "username": "test_user",
+  "password": "test_password"
+}
 
 ###
+
+# Fetch Song Details
+POST http://localhost:8000/fetch-song-details
+Content-Type: application/json
+
+{
+  "username": "test_user",
+  "password": "test_password",
+  "level": 20
+}
+
+###
+
+# Fetch Pumbility Data
+POST http://localhost:8000/fetch-pumbility-data
+Content-Type: application/json
+
+{
+  "username": "test_user",
+  "password": "test_password"
+}
+
+###
+
+# Fetch Recently Played Data
+POST http://localhost:8000/fetch-recently-played
+Content-Type: application/json
+
+{
+  "username": "test_user",
+  "password": "test_password"
+}

@@ -2,6 +2,10 @@ import time
 
 import requests
 from bs4 import BeautifulSoup
+from fastapi import HTTPException
+
+from login import login_to_piugame
+
 
 def fetch_page_content(url, cookies=None):
     """
@@ -239,15 +243,13 @@ def fetch_recently_played_data(html_content):
             score_element = item.select_one(".li_in.ac .tx")
             score = score_element.text.strip() if score_element else "0"
 
-            # 난이도
-            level_imgs = item.select(".stepBall_in .numw .imG img")
-            difficulty = "".join(
-                [img["alt"].replace("d_num_", "").replace(".png", "") for img in level_imgs]
-            )
-
-            # 곡 타입
-            type_img = item.select_one(".stepBall_in .tw img")
-            song_type = "double" if "d_text" in type_img["src"] else "single"
+            # stepball 관련 이미지 소스 가져오기
+            stepball_div = item.select_one(".stepBall_in")
+            stepball_url = stepball_div["style"].split("url('")[1].split("')")[0]
+            stepball_text = stepball_div.select_one(".tw img")["src"]
+            stepball_num_imgs = stepball_div.select(".numw .imG img")
+            stepball_num1 = stepball_num_imgs[0]["src"] if len(stepball_num_imgs) > 0 else None
+            stepball_num2 = stepball_num_imgs[1]["src"] if len(stepball_num_imgs) > 1 else None
 
             # 판정 정보
             judgement_table = item.select(".board_st.ac.recently_play tbody tr td .tx")
@@ -271,8 +273,10 @@ def fetch_recently_played_data(html_content):
             songs.append({
                 "song_name": song_name,
                 "score": score,
-                "difficulty": difficulty,
-                "type": song_type,
+                "stepball_url": stepball_url,
+                "stepball_text": stepball_text,
+                "stepball_num1": stepball_num1,
+                "stepball_num2": stepball_num2,
                 "judgement": judgement_info,
                 "plate_url": plate_url,
                 "background_url": background_url,
@@ -282,3 +286,54 @@ def fetch_recently_played_data(html_content):
 
     return songs
 
+
+def fetch_all_user_data(username: str, password: str):
+    """
+    사용자 계정을 통해 모든 데이터를 한 번에 가져오는 함수
+    """
+    try:
+        session = login_to_piugame(username, password)
+
+        if not session:
+            raise HTTPException(status_code=401, detail="로그인 실패")
+
+        # 사용자 기본 데이터
+        target_url = "https://www.piugame.com/my_page/play_data.php"
+        response = session.get(target_url, verify=False, timeout=30)
+        user_data = parse_user_data(response.text)
+
+        # 모든 레벨 데이터
+        base_url = "https://www.piugame.com/my_page/play_data.php"
+        all_levels_data = fetch_all_levels_data(session, base_url)
+
+        # 특정 레벨별 곡 데이터 (10~27)
+        song_details = {}
+        for level in range(10, 28):
+            try:
+                song_details[level] = fetch_song_details_for_level(session, level)
+            except Exception:
+                song_details[level] = {"message": f"Level {level} 데이터 없음"}
+
+        # Pumbility 데이터
+        pumbility_url = "https://www.piugame.com/my_page/pumbility.php"
+        response = session.get(pumbility_url, verify=False, timeout=30)
+        pumbility_data = extract_pumbility_score_and_songs(response.text)
+
+        # 최근 플레이 기록 데이터
+        recently_played_url = "https://www.piugame.com/my_page/recently_played.php"
+        response = session.get(recently_played_url, verify=False, timeout=30)
+        recently_played_data = fetch_recently_played_data(response.text)
+
+        # 결과 병합
+        result = {
+            "user_data": user_data,
+            "all_levels_data": all_levels_data,
+            "song_details": song_details,
+            "pumbility_data": pumbility_data,
+            "recently_played_data": recently_played_data,
+        }
+
+        return result
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

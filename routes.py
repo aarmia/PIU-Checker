@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from login import login_to_piugame
 from scraper import (
@@ -9,14 +9,43 @@ from scraper import (
     fetch_recently_played_data,
     fetch_all_user_data,
 )
+from datetime import datetime, timedelta
+from fastapi.responses import JSONResponse
 
 # 라우터 초기화
 router = APIRouter()
 
 
+RATE_LIMIT = 5
+user_request_log ={}
 class UserCredentials(BaseModel):
     username: str
     password: str
+
+
+def rate_limiter(client_id: str):
+    """
+    Rate Limiting: 사용자 요청 제한 및 남은 시간 계산
+    """
+    now = datetime.now()
+    if client_id not in user_request_log:
+        user_request_log[client_id] = {"count": 1, "reset_time": now + timedelta(hours=1)}
+        return None  # 제한 없음
+
+    log = user_request_log[client_id]
+    if log["reset_time"] < now:
+        # 제한 시간 초기화
+        user_request_log[client_id] = {"count": 1, "reset_time": now + timedelta(hours=1)}
+        return None
+
+    if log["count"] >= RATE_LIMIT:
+        # 요청 제한 초과
+        remaining_time = log["reset_time"] - now
+        return remaining_time
+
+    # 요청 수 증가
+    log["count"] += 1
+    return None
 
 
 @router.post("/fetch-user-data")
@@ -121,10 +150,22 @@ def fetch_recently_played_endpoint(credentials: UserCredentials):
 
 
 @router.post("/fetch-all-user-data")
-def fetch_all_user_data_endpoint(credentials: UserCredentials):
+def fetch_all_user_data_endpoint(request: Request, credentials: UserCredentials):
     """
     모든 데이터를 한 번의 요청으로 가져오는 엔드포인트
     """
+    client_id = request.client.host  # 클라이언트의 IP 기반 식별
+    limit_reset = rate_limiter(client_id)
+    if limit_reset:
+        return JSONResponse(
+            status_code=429,  # Too Many Requests
+            content={
+                "status": "error",
+                "message": f"요청 제한 초과: {RATE_LIMIT}회 요청 허용",
+                "reset_time": str(limit_reset),
+            },
+        )
+
     try:
         data = fetch_all_user_data(credentials.username, credentials.password)
         return {"status": "success", "data": data}

@@ -1,18 +1,23 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from login import login_to_piugame
 from scraper import (
     parse_user_data,
     extract_pumbility_score_and_songs,
     fetch_all_levels_data,
-    fetch_song_details_for_level, fetch_recently_played_data,
+    fetch_song_details_for_level,
+    fetch_recently_played_data,
+    fetch_all_user_data,
 )
 
+# 라우터 초기화
 router = APIRouter()
+
 
 class UserCredentials(BaseModel):
     username: str
     password: str
+
 
 @router.post("/fetch-user-data")
 def fetch_user_data(credentials: UserCredentials):
@@ -33,6 +38,7 @@ def fetch_user_data(credentials: UserCredentials):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.post("/fetch-all-levels-data")
 def fetch_all_levels_data_endpoint(credentials: UserCredentials):
@@ -93,6 +99,7 @@ def fetch_pumbility_data(credentials: UserCredentials):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @router.post("/fetch-recently-played")
 def fetch_recently_played_endpoint(credentials: UserCredentials):
     """
@@ -108,6 +115,18 @@ def fetch_recently_played_endpoint(credentials: UserCredentials):
         response = session.get(recently_played_url, verify=False, timeout=30)
 
         data = fetch_recently_played_data(response.text)
+        return {"status": "success", "data": data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/fetch-all-user-data")
+def fetch_all_user_data_endpoint(credentials: UserCredentials):
+    """
+    모든 데이터를 한 번의 요청으로 가져오는 엔드포인트
+    """
+    try:
+        data = fetch_all_user_data(credentials.username, credentials.password)
         return {"status": "success", "data": data}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

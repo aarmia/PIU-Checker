@@ -14,6 +14,7 @@ def fetch_page_content(url, cookies=None):
     import requests
     response = requests.get(url, cookies=cookies, verify=False, timeout=30)
     response.raise_for_status()
+    response.encoding = 'utf-8'
     return response.text
 
 
@@ -21,7 +22,7 @@ def parse_user_data(html_content):
     """
     사용자 데이터를 HTML에서 파싱하여 반환
     """
-    soup = BeautifulSoup(html_content, 'html.parser')
+    soup = BeautifulSoup(html_content, 'html.parser', from_encoding='utf-8')
     user_data = {
         "level": soup.select_one(".subProfile_wrap .t1.en").text.strip()
         if soup.select_one(".subProfile_wrap .t1.en") else "Unknown",
@@ -70,6 +71,7 @@ def fetch_all_levels_data(session, base_url):
 
         # 레벨별 페이지 요청
         response = session.get(url, verify=False, timeout=30)
+        response.encoding = 'utf-8'
         response.raise_for_status()
 
         # HTML 파싱
@@ -97,6 +99,7 @@ def fetch_song_details_for_level(session: requests.Session, level: int):
         print(f"Fetching page {page} for level {level}...")
         url = f"{base_url}?lv={level}&&page={page}"
         response = session.get(url, verify=False, timeout=30)
+        response.encoding = 'utf-8'
         response.raise_for_status()
 
         soup = BeautifulSoup(response.text, "html.parser")
@@ -300,6 +303,7 @@ def fetch_all_user_data(username: str, password: str):
         # 사용자 기본 데이터
         target_url = "https://www.piugame.com/my_page/play_data.php"
         response = session.get(target_url, verify=False, timeout=30)
+        response.encoding = 'utf-8'
         user_data = parse_user_data(response.text)
 
         # 모든 레벨 데이터

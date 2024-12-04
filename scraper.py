@@ -1,5 +1,4 @@
 import time
-
 import requests
 from bs4 import BeautifulSoup
 from fastapi import HTTPException
@@ -20,42 +19,50 @@ def fetch_page_content(url, cookies=None):
 
 def parse_user_data(html_content):
     """
-    사용자 데이터를 HTML에서 파싱하여 반환
+    사용자 데이터와 플레이 데이터를 HTML에서 파싱하여 반환
     """
     soup = BeautifulSoup(html_content, 'html.parser', from_encoding='utf-8')
+
+    # user_data 추출
+    profile_img_style = soup.select_one('.profile_img .bgfix')["style"]
+    profile_img = (
+        profile_img_style.split("url('")[1].split("')")[0]
+        if "url('" in profile_img_style else "Unknown"
+    )
+
+    play_count_element = soup.select_one('.board_search .total .t2')
+    play_count = play_count_element.text.strip() if play_count_element else "0"
+
     user_data = {
         "level": soup.select_one(".subProfile_wrap .t1.en").text.strip()
         if soup.select_one(".subProfile_wrap .t1.en") else "Unknown",
         "nickname": soup.select_one(".subProfile_wrap .t2.en").text.strip()
         if soup.select_one(".subProfile_wrap .t2.en") else "Unknown",
-        "last_login_date": (
-            soup.find("li", text=lambda t: t and "최근 접속일" in t).text.split(":")[1].strip()
-            if soup.find("li", text=lambda t: t and "최근 접속일" in t) else "Unknown"
-        ),
-        "last_play_location": (
-            soup.find("li", text=lambda t: t and "최근 접속 게임장" in t).text.split(":")[1].strip()
-            if soup.find("li", text=lambda t: t and "최근 접속 게임장" in t) else "Unknown"
-        ),
-        "points": soup.select_one(".profile_etc .tt.en").text.strip()
-        if soup.select_one(".profile_etc .tt.en") else "0"
+        "profile_img": profile_img,
+        "play_count": play_count
     }
+
+    # play_data 추출
+    rating_element = soup.select_one(".play_data_wrap .num.fontSt")
+    clear_data_element = soup.select_one(".clear_w .t1")
+    progress_element = soup.select_one(".clear_w .graph .num")
 
     play_data = {
-        "play_count": (
-            soup.find("div", text="Play Count").find_next("i", class_="t2").text.strip()
-            if soup.find("div", text="Play Count") else "0"
-        ),
-        "rating": soup.select_one(".play_data_wrap .num.fontSt").text.strip()
-        if soup.select_one(".play_data_wrap .num.fontSt") else "0",
-        "clear_data": soup.select_one(".clear_w .t1").text.strip()
-        if soup.select_one(".clear_w .t1") else "0",
-        "progress": (
-            soup.select_one(".clear_w .graph .num").text.strip()
-            if soup.select_one(".clear_w .graph .num") else "0%"
-        )
+        "rating": rating_element.text.strip() if rating_element else "0",
+        "clear_data": clear_data_element.text.strip() if clear_data_element else "0",
+        "progress": progress_element.text.strip() if progress_element else "0%"
     }
 
-    return {"user_data": user_data, "play_data": play_data}
+    # plate_data 추출
+    plate_data = {}
+    plate_items = soup.select('.plate_w .list_in')
+    for plate in plate_items:
+        plate_type = plate.select_one('.play_log_btn[data-type]')["data-type"]
+        plate_value = plate.select_one('.t_num').text.strip()
+        plate_data[plate_type] = plate_value
+
+    return {"user_data": user_data, "play_data": play_data, "plate_data": plate_data}
+
 
 
 def fetch_all_levels_data(session, base_url):
@@ -98,7 +105,7 @@ def fetch_song_details_for_level(session: requests.Session, level: int):
     while True:
         print(f"Fetching page {page} for level {level}...")
         url = f"{base_url}?lv={level}&&page={page}"
-        response = session.get(url, verify=False, timeout=30)
+        response = session.get(url, verify=False, timeout=90)
         response.encoding = 'utf-8'
         response.raise_for_status()
 
@@ -305,6 +312,8 @@ def fetch_all_user_data(username: str, password: str):
         response = session.get(target_url, verify=False, timeout=30)
         response.encoding = 'utf-8'
         user_data = parse_user_data(response.text)
+
+
 
         # 모든 레벨 데이터
         base_url = "https://www.piugame.com/my_page/play_data.php"

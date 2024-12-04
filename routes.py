@@ -62,11 +62,15 @@ def fetch_user_data(credentials: UserCredentials):
         target_url = "https://www.piugame.com/my_page/play_data.php"
         response = session.get(target_url, verify=False, timeout=30)
 
+        # user_data, play_data, plate_data 파싱
         parsed_data = parse_user_data(response.text)
+
         return {"status": "success", "data": parsed_data}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
 
 
 @router.post("/fetch-all-levels-data")

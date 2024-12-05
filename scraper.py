@@ -47,10 +47,16 @@ def parse_user_data(html_content):
     clear_data_element = soup.select_one(".clear_w .t1")
     progress_element = soup.select_one(".clear_w .graph .num")
 
+    # 진행도 계산 (소수점 아래 2자리)
+    progress_text = progress_element.text.strip() if progress_element else "0%"
+    progress_percentage = progress_text.strip('%')
+    progress_value = round(float(progress_percentage) / 100, 2) if progress_percentage.isdigit() else 0.0
+
     play_data = {
         "rating": rating_element.text.strip() if rating_element else "0",
         "clear_data": clear_data_element.text.strip() if clear_data_element else "0",
-        "progress": progress_element.text.strip() if progress_element else "0%"
+        "progress": progress_text,
+        "progress_value": progress_value  # 소수점 아래 2자리
     }
 
     # plate_data 추출
@@ -62,7 +68,6 @@ def parse_user_data(html_content):
         plate_data[plate_type] = plate_value
 
     return {"user_data": user_data, "play_data": play_data, "plate_data": plate_data}
-
 
 
 def fetch_all_levels_data(session, base_url):
@@ -91,10 +96,16 @@ def fetch_all_levels_data(session, base_url):
             clear_data_element = soup.select_one(".clear_w .t1")
             progress_element = soup.select_one(".clear_w .graph .num")
 
+            # 진행도 계산 (소수점 아래 2자리)
+            progress_text = progress_element.text.strip() if progress_element else "0%"
+            progress_percentage = progress_text.strip('%')
+            progress_value = round(float(progress_percentage) / 100, 2) if progress_percentage.isdigit() else 0.0
+
             play_data = {
                 "rating": rating_element.text.strip() if rating_element else "0",
                 "clear_data": clear_data_element.text.strip() if clear_data_element else "0",
-                "progress": progress_element.text.strip() if progress_element else "0%"
+                "progress": progress_text,
+                "progress_value": progress_value  # 소수점 아래 2자리
             }
 
             # Plate 데이터 추출
@@ -119,7 +130,7 @@ def fetch_all_levels_data(session, base_url):
             # 디버깅 로그 추가
             print(f"Error processing level {level}: {e}")
             level_data[level] = {
-                "play_data": {"rating": "0", "clear_data": "0", "progress": "0%"},
+                "play_data": {"rating": "0", "clear_data": "0", "progress": "0%", "progress_value": 0.0},
                 "plate_data": {ptype: "0" for ptype in plate_types}
             }
 

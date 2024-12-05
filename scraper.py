@@ -60,12 +60,17 @@ def parse_user_data(html_content):
     }
 
     # plate_data 추출
-    plate_data = {}
+    plate_types = ["pg", "ug", "eg", "sg", "mg", "tg", "fg", "rg"]
+    plate_data = {ptype: "0" for ptype in plate_types}  # 기본값 설정
     plate_items = soup.select('.plate_w .list_in')
     for plate in plate_items:
-        plate_type = plate.select_one('.play_log_btn[data-type]')["data-type"]
-        plate_value = plate.select_one('.t_num').text.strip()
-        plate_data[plate_type] = plate_value
+        play_log_btn = plate.select_one('.play_log_btn[data-type]')
+        if play_log_btn:
+            plate_type = play_log_btn.get("data-type")
+            if plate_type in plate_types:
+                plate_value_element = plate.select_one('.t_num')
+                plate_value = plate_value_element.text.strip() if plate_value_element else "0"
+                plate_data[plate_type] = plate_value
 
     return {"user_data": user_data, "play_data": play_data, "plate_data": plate_data}
 

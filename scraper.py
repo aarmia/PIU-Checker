@@ -77,10 +77,10 @@ def parse_user_data(html_content):
 
 def fetch_all_levels_data(session, base_url):
     """
-    모든 레벨 데이터를 수집하여 반환, plate_data 포함
+    모든 레벨 데이터를 수집하여 리스트 형식으로 반환, plate_data 포함
     """
     levels = list(range(10, 27)) + ["27over"]
-    level_data = {}
+    result_data = []  # 리스트로 데이터 저장
     plate_types = ["pg", "ug", "eg", "sg", "mg", "tg", "fg", "rg"]  # 8개 플레이트 정의
 
     for level in levels:
@@ -125,21 +125,23 @@ def fetch_all_levels_data(session, base_url):
                         plate_value = plate_value_element.text.strip() if plate_value_element else "0"
                         plate_data[plate_type] = plate_value
 
-            # 레벨 데이터 저장
-            level_data[level] = {
+            # 레벨 데이터 저장 (리스트에 추가)
+            result_data.append({
+                "level": str(level),
                 "play_data": play_data,
                 "plate_data": plate_data
-            }
+            })
 
         except Exception as e:
             # 디버깅 로그 추가
             print(f"Error processing level {level}: {e}")
-            level_data[level] = {
+            result_data.append({
+                "level": str(level),
                 "play_data": {"rating": "0", "clear_data": "0", "progress": "0%", "progress_value": 0.0},
                 "plate_data": {ptype: "0" for ptype in plate_types}
-            }
+            })
 
-    return level_data
+    return {"all_levels_data": result_data}  # 리스트 형식으로 반환
 
 
 def fetch_song_details_for_level(session: requests.Session, level: int):

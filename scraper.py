@@ -42,106 +42,113 @@ def parse_user_data(html_content):
         "play_count": play_count
     }
 
-    # play_data 추출
-    rating_element = soup.select_one(".play_data_wrap .num.fontSt")
-    clear_data_element = soup.select_one(".clear_w .t1")
-    progress_element = soup.select_one(".clear_w .graph .num")
-
-    # 진행도 계산 (소수점 아래 2자리)
-    progress_text = progress_element.text.strip() if progress_element else "0%"
-    progress_percentage = progress_text.strip('%')
-    progress_value = round(float(progress_percentage) / 100, 2) if progress_percentage.isdigit() else 0.0
-
-    play_data = {
-        "rating": rating_element.text.strip() if rating_element else "0",
-        "clear_data": clear_data_element.text.strip() if clear_data_element else "0",
-        "progress": progress_text,
-        "progress_value": progress_value  # 소수점 아래 2자리
-    }
-
-    # plate_data 추출
-    plate_types = ["pg", "ug", "eg", "sg", "mg", "tg", "fg", "rg"]
-    plate_data = {ptype: "0" for ptype in plate_types}  # 기본값 설정
-    plate_items = soup.select('.plate_w .list_in')
-    for plate in plate_items:
-        play_log_btn = plate.select_one('.play_log_btn[data-type]')
-        if play_log_btn:
-            plate_type = play_log_btn.get("data-type")
-            if plate_type in plate_types:
-                plate_value_element = plate.select_one('.t_num')
-                plate_value = plate_value_element.text.strip() if plate_value_element else "0"
-                plate_data[plate_type] = plate_value
-
-    return {"user_data": user_data, "play_data": play_data, "plate_data": plate_data}
+    return user_data
 
 
 def fetch_all_levels_data(session, base_url):
     """
-    모든 레벨 데이터를 수집하여 리스트 형식으로 반환, plate_data 포함
+    모든 레벨 데이터를 수집하여 반환. 'ALL' 데이터를 상단에 추가.
     """
     levels = list(range(10, 27)) + ["27over"]
     result_data = []  # 리스트로 데이터 저장
     plate_types = ["pg", "ug", "eg", "sg", "mg", "tg", "fg", "rg"]  # 8개 플레이트 정의
 
+    # Step 1: Fetch "ALL" data from /fetch-user-data
+    all_url = f"{base_url}"  # 중복 제거
+    try:
+        all_response = session.get(all_url, verify=False, timeout=30)
+        all_response.raise_for_status()
+        all_soup = BeautifulSoup(all_response.text, 'html.parser')
+
+        # 플레이 데이터 추출
+        rating = all_soup.select_one(".play_data_wrap .num.fontSt")
+        clear_data = all_soup.select_one(".clear_w .t1")
+        progress = all_soup.select_one(".clear_w .graph .num")
+
+        progress_text = progress.text.strip() if progress else "0%"
+        progress_percentage = progress_text.strip('%')
+        progress_value = round(float(progress_percentage) / 100, 2) if progress_percentage.isdigit() else 0.0
+
+        play_data = {
+            "rating": rating.text.strip() if rating else "0",
+            "clear_data": clear_data.text.strip() if clear_data else "0",
+            "progress": progress_text,
+            "progress_value": progress_value
+        }
+
+        # 플레이트 데이터 추출
+        plate_data = {ptype: "0" for ptype in plate_types}
+        plates = all_soup.select('.plate_w .list_in')
+        for plate in plates:
+            plate_type = plate.select_one('.play_log_btn[data-type]')
+            if plate_type:
+                plate_key = plate_type.get("data-type")
+                if plate_key in plate_types:
+                    plate_value = plate.select_one('.t_num').text.strip()
+                    plate_data[plate_key] = plate_value
+
+        result_data.append({
+            "level": "ALL",
+            "play_data": play_data,
+            "plate_data": plate_data
+        })
+    except Exception as e:
+        print(f"Error fetching ALL data: {e}")
+        result_data.append({
+            "level": "ALL",
+            "play_data": {"rating": "0", "clear_data": "0/0", "progress": "0%", "progress_value": 0.0},
+            "plate_data": {ptype: "0" for ptype in plate_types}
+        })
+
+    # Step 2: Fetch individual level data
     for level in levels:
         try:
-            # URL 생성
             url = f"{base_url}?lv={level}" if level != "27over" else f"{base_url}?lv=27over"
-
-            # 레벨별 페이지 요청
             response = session.get(url, verify=False, timeout=30)
-            response.encoding = 'utf-8'
             response.raise_for_status()
-
-            # HTML 파싱
             soup = BeautifulSoup(response.text, 'html.parser')
 
-            # 플레이 데이터 추출
-            rating_element = soup.select_one(".play_data_wrap .num.fontSt")
-            clear_data_element = soup.select_one(".clear_w .t1")
-            progress_element = soup.select_one(".clear_w .graph .num")
+            # 플레이 데이터
+            rating = soup.select_one(".play_data_wrap .num.fontSt")
+            clear_data = soup.select_one(".clear_w .t1")
+            progress = soup.select_one(".clear_w .graph .num")
 
-            # 진행도 계산 (소수점 아래 2자리)
-            progress_text = progress_element.text.strip() if progress_element else "0%"
+            progress_text = progress.text.strip() if progress else "0%"
             progress_percentage = progress_text.strip('%')
             progress_value = round(float(progress_percentage) / 100, 2) if progress_percentage.isdigit() else 0.0
 
             play_data = {
-                "rating": rating_element.text.strip() if rating_element else "0",
-                "clear_data": clear_data_element.text.strip() if clear_data_element else "0",
+                "rating": rating.text.strip() if rating else "0",
+                "clear_data": clear_data.text.strip() if clear_data else "0",
                 "progress": progress_text,
-                "progress_value": progress_value  # 소수점 아래 2자리
+                "progress_value": progress_value
             }
 
-            # Plate 데이터 추출
-            plate_data = {ptype: "0" for ptype in plate_types}  # 기본값 설정
-            plate_items = soup.select('.plate_w .list_in')
-            for plate in plate_items:
-                play_log_btn = plate.select_one('.play_log_btn[data-type]')
-                if play_log_btn:
-                    plate_type = play_log_btn.get("data-type")
-                    if plate_type in plate_types:
-                        plate_value_element = plate.select_one('.t_num')
-                        plate_value = plate_value_element.text.strip() if plate_value_element else "0"
-                        plate_data[plate_type] = plate_value
+            # 플레이트 데이터
+            plate_data = {ptype: "0" for ptype in plate_types}
+            plates = soup.select('.plate_w .list_in')
+            for plate in plates:
+                plate_type = plate.select_one('.play_log_btn[data-type]')
+                if plate_type:
+                    plate_key = plate_type.get("data-type")
+                    if plate_key in plate_types:
+                        plate_value = plate.select_one('.t_num').text.strip()
+                        plate_data[plate_key] = plate_value
 
-            # 레벨 데이터 저장 (리스트에 추가)
             result_data.append({
                 "level": str(level),
                 "play_data": play_data,
                 "plate_data": plate_data
             })
-
         except Exception as e:
-            # 디버깅 로그 추가
             print(f"Error processing level {level}: {e}")
             result_data.append({
                 "level": str(level),
-                "play_data": {"rating": "0", "clear_data": "0", "progress": "0%", "progress_value": 0.0},
+                "play_data": {"rating": "0", "clear_data": "0/0", "progress": "0%", "progress_value": 0.0},
                 "plate_data": {ptype: "0" for ptype in plate_types}
             })
 
-    return {"all_levels_data": result_data}  # 리스트 형식으로 반환
+    return result_data
 
 
 def fetch_song_details_for_level(session: requests.Session, level: int):

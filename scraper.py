@@ -228,31 +228,6 @@ def fetch_song_details_for_level(session: requests.Session, level: int):
     return song_data
 
 
-
-def extract_plate_grade(item):
-    """
-    Plate 정보를 추출하고, 등급 정보를 반환.
-    """
-    plate_tag = item.select_one('.grade_wrap .img img')  # Plate 이미지 선택
-    if not plate_tag or "src" not in plate_tag.attrs:
-        return "Unknown"
-
-    image_url = plate_tag["src"]
-    # URL에서 파일명 추출
-    image_filename = image_url.split("/")[-1]  # 예: "aa_p.png"
-
-    # Plate 정보 처리
-    if "_p" in image_filename:
-        grade = image_filename.replace("_p", "").replace(".png", "").upper()
-        """
-        print(f"DEBUG: Plate 파일명 - {image_filename}, 결과 - {grade}")
-        """
-        return f"{grade}+"
-    else:
-        grade = image_filename.replace(".png", "").upper()
-        return grade
-
-
 def extract_pumbility_score_and_songs(html_content):
     """
     Pumbility 점수와 곡 리스트에서 Plate 정보를 포함해 데이터를 반환.
@@ -266,21 +241,42 @@ def extract_pumbility_score_and_songs(html_content):
     # 곡 리스트 추출
     song_list = []
     song_items = soup.select('.rating_rangking_list_w ul.list > li')
+
     for item in song_items:
+        # 곡 이름
         name_tag = item.select_one('.name .t1')
+
+        # 아티스트
         artist_tag = item.select_one('.name .t2')
+
+        # 펌빌리티 점수
         score_tag = item.select_one('.score .tt.en')
+
+        # 날짜
         date_tag = item.select_one('.date .tt')
 
-        # Plate 등급 정보 추출
-        plate_grade = extract_plate_grade(item)
+        # 플레이트 이미지 URL
+        plate_img_element = item.select_one(".grade_wrap .img img")
+        plate_img = plate_img_element["src"] if plate_img_element else "Unknown"
+
+        # 스텝볼 이미지 URL
+        stepball_img_element = item.select_one(".stepBall_img_wrap .stepBall_in")
+        stepball_img = stepball_img_element["style"].split("url(")[-1].strip(")") if stepball_img_element else "Unknown"
+
+        # 스텝볼 내부 하위 이미지 URL
+        stepball_inner_elements = item.select(".stepBall_img_wrap .stepBall_in .imG img")
+        stepball_inner_images = [
+            img["src"] for img in stepball_inner_elements if "src" in img.attrs
+        ]
 
         song_data = {
             "name": name_tag.text.strip() if name_tag else "Unknown",
             "artist": artist_tag.text.strip() if artist_tag else "Unknown",
             "score": score_tag.text.strip() if score_tag else "Unknown",
             "date": date_tag.text.strip() if date_tag else "Unknown",
-            "plate": plate_grade  # Plate 등급 정보
+            "plate_img": plate_img,
+            "stepball_img": stepball_img,
+            "stepball_inner_img": stepball_inner_images,
         }
         song_list.append(song_data)
 

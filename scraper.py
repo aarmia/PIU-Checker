@@ -263,6 +263,13 @@ def extract_pumbility_score_and_songs(html_content):
         stepball_img_element = item.select_one(".stepBall_img_wrap .stepBall_in")
         stepball_img = stepball_img_element["style"].split("url(")[-1].strip(")") if stepball_img_element else "Unknown"
 
+        # 스텝볼 타입 결정 (d 또는 s)
+        step_type = "d" if "d_bg" in stepball_img else "s"
+
+        # 스텝볼 내부 `tw` div 클래스의 이미지 URL
+        stepball_tw_element = item.select_one(".stepBall_img_wrap .stepBall_in .tw img")
+        stepball_tw_img = stepball_tw_element["src"] if stepball_tw_element else "Unknown"
+
         # 스텝볼 내부 하위 이미지 URL
         stepball_inner_elements = item.select(".stepBall_img_wrap .stepBall_in .imG img")
         stepball_inner_images = [
@@ -275,7 +282,8 @@ def extract_pumbility_score_and_songs(html_content):
             "score": score_tag.text.strip() if score_tag else "Unknown",
             "date": date_tag.text.strip() if date_tag else "Unknown",
             "plate_img": plate_img,
-            "stepball_img": stepball_img,
+            "step_type": step_type,
+            "stepball_tw_img": stepball_tw_img,
             "stepball_inner_img": stepball_inner_images,
         }
         song_list.append(song_data)

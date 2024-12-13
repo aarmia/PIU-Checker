@@ -329,9 +329,9 @@ def fetch_recently_played_data(html_content):
                 "miss": judgement_table[4].text.strip() if len(judgement_table) > 4 else "0",
             }
 
-            # 플레이트 이미지 URL
-            plate_img = item.select_one(".li_in.st1 img")
-            plate_url = plate_img["src"] if plate_img else "STAGE BREAK"
+            # .li_in.ac 이미지 URL 추출
+            plate_tag = item.select_one('.li_in.ac img')
+            plate_url = plate_tag["src"] if plate_tag and plate_tag.get("src") else "0"
 
             # 곡 배경 URL
             background_style = item.select_one(".wrap_in .in.bgfix")["style"]

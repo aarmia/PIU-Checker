@@ -1,5 +1,5 @@
-import time
-import requests
+import asyncio
+import aiohttp
 from bs4 import BeautifulSoup
 from fastapi import HTTPException
 
@@ -151,81 +151,93 @@ def fetch_all_levels_data(session, base_url):
     return result_data
 
 
-def fetch_song_details_for_level(session: requests.Session, level: int):
+async def fetch_song_details_for_level(session, level, progress_tracker):
+    """
+    특정 레벨의 곡 데이터를 비동기적으로 가져오는 함수
+    페이지별로 데이터를 가져오고 마지막 페이지를 정확히 처리
+    """
     base_url = "https://www.piugame.com/my_page/my_best_score.php"
     song_data = {"single": [], "double": []}
     page = 1
 
     while True:
-        print(f"Fetching page {page} for level {level}...")
-        url = f"{base_url}?lv={level}&&page={page}"
-        response = session.get(url, verify=False, timeout=90)
-        response.encoding = 'utf-8'
-        response.raise_for_status()
+        try:
+            url = f"{base_url}?lv={level}&page={page}"
+            async with session.get(url) as response:
+                html = await response.text()
+                soup = BeautifulSoup(html, "html.parser")
 
-        soup = BeautifulSoup(response.text, "html.parser")
+                # 곡 정보를 포함하는 리스트 선택
+                song_items = soup.select(".my_best_scoreList li")
+                if not song_items:
+                    break  # 더 이상 곡 정보가 없으면 종료
 
-        # 곡 정보를 포함하는 리스트 선택
-        song_items = soup.select(".my_best_scoreList li")
-        if not song_items:
-            break  # 더 이상 곡 정보가 없으면 종료
+                for item in song_items:
+                    try:
+                        # 곡 이름
+                        name_element = item.select_one(".song_name p")
+                        song_name = name_element.text.strip() if name_element else "Unknown"
 
-        for index, song in enumerate(song_items):
-            try:
-                # 곡 이름 확인
-                name_element = song.select_one(".song_name p")
-                if not name_element:
-                    continue
-                song_name = name_element.text.strip()
+                        # 점수
+                        score_element = item.select_one(".txt_v .num")
+                        score = int(score_element.text.strip().replace(",", "")) if score_element else 0
 
-                # 점수 확인
-                score_element = song.select_one(".txt_v .num")
-                if not score_element:
-                    print(f"Skipping item {index}: score not found")
-                    continue
-                score_text = score_element.text.strip().replace(",", "")
-                score = int(score_text)
-                formatted_score = (
-                    f"{score / 10000:.1f}" if score < 1000000 else f"{score // 10000}"
-                )
+                        # 타입 결정 (single/double)
+                        type_element = item.select_one(".stepBall_img_wrap .tw img")
+                        if not type_element:
+                            continue
+                        song_type = "double" if "d_text" in type_element.get("src", "") else "single"
 
-                # 스코어가 0인 경우 생략
-                if formatted_score == "0.0":
-                    print(f"Skipping item {index}: score is 0")
-                    continue
+                        # 데이터 저장
+                        song_data[song_type].append({
+                            "name": song_name,
+                            "score": score
+                        })
+                    except Exception as e:
+                        print(f"Error parsing song item: {e}")
 
-                # 곡 타입 확인
-                type_element = song.select_one(".stepBall_img_wrap .tw img")
-                if not type_element:
-                    print(f"Skipping item {index}: type information not found")
-                    continue
-                type_url = type_element.get("src", "")
-                song_type = "double" if "d_text" in type_url else "single"
+                # 현재 페이지와 최대 페이지 파싱
+                current_page = int(soup.select_one(".board_paging .on").text.strip())
+                all_pages = soup.select(".board_paging button:not(.icon)")
+                max_page = max(int(btn.text.strip()) for btn in all_pages)
 
-                # 결과 저장
-                song_data[song_type].append(
-                    {
-                        "name": song_name,
-                        "score": float(formatted_score),
-                    }
-                )
+                if current_page >= max_page:
+                    break  # 마지막 페이지라면 종료
 
-            except Exception as e:
-                print(f"Error parsing song item at index {index}: {e}")
-
-        next_page = soup.select_one(".board_paging .xi.next")
-        if not next_page:
-            print("No more items found")
+                page += 1  # 다음 페이지로 이동
+        except Exception as e:
+            print(f"Error fetching level {level}, page {page}: {e}")
             break
-
-        page += 1
-        time.sleep(1)
 
     # 점수 기준 내림차순 정렬
     song_data["single"].sort(key=lambda x: x["score"], reverse=True)
     song_data["double"].sort(key=lambda x: x["score"], reverse=True)
 
+    # 작업 완료 메시지와 진행도 업데이트
+    progress_tracker["completed"] += 1
+    print(f"[INFO] Level {level} scraping completed. Progress: {progress_tracker['completed']}/{progress_tracker['total']}")
+
     return song_data
+
+
+async def fetch_song_details_for_all_levels(username, password):
+    """
+    모든 레벨(10~27)의 곡 데이터를 비동기적으로 가져오는 함수
+    레벨별로 데이터를 single, double로 분류하고 점수 기준으로 정렬
+    작업 진행도를 출력
+    """
+    session = login_to_piugame(username, password)
+    if not session:
+        raise HTTPException(status_code=401, detail="로그인 실패")
+
+    async with aiohttp.ClientSession(cookies=session.cookies) as async_session:
+        levels = list(range(10, 28))
+        progress_tracker = {"total": len(levels), "completed": 0}
+        tasks = [fetch_song_details_for_level(async_session, level, progress_tracker) for level in levels]
+        results = await asyncio.gather(*tasks)
+
+    # 결과를 레벨별로 매핑
+    return {f"level_{level}": data for level, data in zip(levels, results)}
 
 
 def extract_pumbility_score_and_songs(html_content):
@@ -371,19 +383,9 @@ def fetch_all_user_data(username: str, password: str):
         response.encoding = 'utf-8'
         user_data = parse_user_data(response.text)
 
-
-
         # 모든 레벨 데이터
         base_url = "https://www.piugame.com/my_page/play_data.php"
         all_levels_data = fetch_all_levels_data(session, base_url)
-
-        # 특정 레벨별 곡 데이터 (10~27)
-        song_details = {}
-        for level in range(10, 28):
-            try:
-                song_details[level] = fetch_song_details_for_level(session, level)
-            except Exception:
-                song_details[level] = {"message": f"Level {level} 데이터 없음"}
 
         # Pumbility 데이터
         pumbility_url = "https://www.piugame.com/my_page/pumbility.php"
@@ -399,7 +401,6 @@ def fetch_all_user_data(username: str, password: str):
         result = {
             "user_data": user_data,
             "all_levels_data": all_levels_data,
-            "song_details": song_details,
             "pumbility_data": pumbility_data,
             "recently_played_data": recently_played_data,
         }

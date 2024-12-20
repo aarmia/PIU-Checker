@@ -1,3 +1,5 @@
 # created by virtualenv automatically
 *.pyc
+*.py[cod]
 __pycache__/
+*.http

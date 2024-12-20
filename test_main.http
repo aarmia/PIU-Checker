@@ -28,8 +28,7 @@ Content-Type: application/json
 
 {
   "username": "test_user",
-  "password": "test_password",
-  "level": 20
+  "password": "test_password"
 }
 
 ###

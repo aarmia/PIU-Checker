@@ -248,7 +248,10 @@ def extract_pumbility_score_and_songs(html_content):
 
     # Pumbility 점수 추출
     score_tag = soup.select_one('.pumbility_total_wrap .t2.en')
-    pumbility_score = score_tag.text.strip() if score_tag else "Unknown"
+    pumbility_score_element = score_tag.text.strip() if score_tag else "Unknown"
+
+    # "," 제거 및 정수 변환
+    pumbility_score = int(pumbility_score_element.replace(",", ""))
 
     # 곡 리스트 추출
     song_list = []
@@ -288,6 +291,10 @@ def extract_pumbility_score_and_songs(html_content):
             img["src"] for img in stepball_inner_elements if "src" in img.attrs
         ]
 
+        # 배경 이미지 URL
+        bg_style = item.select_one('.profile_img .resize .re.bgfix')['style']
+        bg_url = bg_style.split("url('")[1].split("')")[0] if bg_style else None
+
         song_data = {
             "name": name_tag.text.strip() if name_tag else "Unknown",
             "artist": artist_tag.text.strip() if artist_tag else "Unknown",
@@ -297,6 +304,7 @@ def extract_pumbility_score_and_songs(html_content):
             "step_type": step_type,
             "stepball_tw_img": stepball_tw_img,
             "stepball_inner_img": stepball_inner_images,
+            "bg_img": bg_url,
         }
         song_list.append(song_data)
 

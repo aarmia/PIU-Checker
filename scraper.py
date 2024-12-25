@@ -151,10 +151,26 @@ def fetch_all_levels_data(session, base_url):
     return result_data
 
 
+# 동시 요청 제한을 위한 Semaphore 설정
+SEMAPHORE = asyncio.Semaphore(5)  # 최대 5개의 요청만 동시 처리
+
+
+async def fetch_page_with_limit(session, url):
+    """
+    동시 요청 제한을 적용하여 페이지 데이터를 가져옵니다.
+    """
+    async with SEMAPHORE:  # Semaphore로 동시 요청 수 제한
+        try:
+            async with session.get(url, timeout=30) as response:
+                response.raise_for_status()
+                return await response.text()
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"요청 실패: {str(e)}")
+
+
 async def fetch_song_details_for_level(session, level, progress_tracker):
     """
-    특정 레벨의 곡 데이터를 비동기적으로 가져오는 함수
-    페이지별로 데이터를 가져오고 마지막 페이지를 정확히 처리
+    특정 레벨의 곡 데이터를 수집합니다.
     """
     base_url = "https://www.piugame.com/my_page/my_best_score.php"
     song_data = {"single": [], "double": []}
@@ -163,80 +179,81 @@ async def fetch_song_details_for_level(session, level, progress_tracker):
     while True:
         try:
             url = f"{base_url}?lv={level}&page={page}"
-            async with session.get(url) as response:
-                html = await response.text()
-                soup = BeautifulSoup(html, "html.parser")
+            html = await fetch_page_with_limit(session, url)  # 동시 요청 제한 적용
+            soup = BeautifulSoup(html, "html.parser")
 
-                # 곡 정보를 포함하는 리스트 선택
-                song_items = soup.select(".my_best_scoreList li")
-                if not song_items:
-                    break  # 더 이상 곡 정보가 없으면 종료
+            # 곡 데이터 추출
+            song_items = soup.select(".my_best_scoreList li")
+            if not song_items:
+                break
 
-                for item in song_items:
-                    try:
-                        # 곡 이름
-                        name_element = item.select_one(".song_name p")
-                        song_name = name_element.text.strip() if name_element else "Unknown"
+            for song in song_items:
+                # 곡 이름
+                name_element = song.select_one(".song_name p")
+                if not name_element:
+                    continue
+                song_name = name_element.text.strip()
 
-                        # 점수
-                        score_element = item.select_one(".txt_v .num")
-                        score = int(score_element.text.strip().replace(",", "")) if score_element else 0
+                # 점수
+                score_element = song.select_one(".txt_v .num")
+                score = int(score_element.text.replace(",", "")) if score_element else 0
 
-                        # 타입 결정 (single/double)
-                        type_element = item.select_one(".stepBall_img_wrap .tw img")
-                        if not type_element:
-                            continue
-                        song_type = "double" if "d_text" in type_element.get("src", "") else "single"
+                # NN.N 형식으로 변환 (수정된 부분)
+                formatted_score = f"{score / 10000:.1f}"  # 점수를 NN.N 형태로 변환
 
-                        # 데이터 저장
-                        song_data[song_type].append({
-                            "name": song_name,
-                            "score": score
-                        })
-                    except Exception as e:
-                        print(f"Error parsing song item: {e}")
+                # 싱글/더블 구분
+                type_element = song.select_one(".stepBall_img_wrap .tw img")
+                song_type = "double" if "d_text" in type_element.get("src", "") else "single"
 
-                # 현재 페이지와 최대 페이지 파싱
-                current_page = int(soup.select_one(".board_paging .on").text.strip())
-                all_pages = soup.select(".board_paging button:not(.icon)")
-                max_page = max(int(btn.text.strip()) for btn in all_pages)
+                # 데이터 추가
+                song_data[song_type].append({
+                    "name": song_name,
+                    "score": formatted_score
+                })
 
-                if current_page >= max_page:
-                    break  # 마지막 페이지라면 종료
+            # 다음 페이지 확인
+            current_page = int(soup.select_one(".board_paging .on").text.strip())
+            max_page = max(int(btn.text.strip()) for btn in soup.select(".board_paging button:not(.icon)"))
+            if current_page >= max_page:
+                break
+            page += 1
 
-                page += 1  # 다음 페이지로 이동
         except Exception as e:
-            print(f"Error fetching level {level}, page {page}: {e}")
+            print(f"레벨 {level}, 페이지 {page} 처리 중 오류 발생: {e}")
             break
 
     # 점수 기준 내림차순 정렬
-    song_data["single"].sort(key=lambda x: x["score"], reverse=True)
-    song_data["double"].sort(key=lambda x: x["score"], reverse=True)
+    song_data["single"].sort(key=lambda x: float(x["score"]), reverse=True)
+    song_data["double"].sort(key=lambda x: float(x["score"]), reverse=True)
 
-    # 작업 완료 메시지와 진행도 업데이트
+    # 진행 상황 메시지 추가
     progress_tracker["completed"] += 1
-    print(f"[INFO] Level {level} scraping completed. Progress: {progress_tracker['completed']}/{progress_tracker['total']}")
+    print(f"[INFO] Level {level} 완료. 진행률: {progress_tracker['completed']}/{progress_tracker['total']}")
 
     return song_data
 
 
 async def fetch_song_details_for_all_levels(username, password):
     """
-    모든 레벨(10~27)의 곡 데이터를 비동기적으로 가져오는 함수
-    레벨별로 데이터를 single, double로 분류하고 점수 기준으로 정렬
-    작업 진행도를 출력
+    모든 레벨의 곡 데이터를 병렬 처리 및 동시 요청 제한을 적용하여 수집합니다.
     """
+    # 로그인 세션 생성
     session = login_to_piugame(username, password)
     if not session:
         raise HTTPException(status_code=401, detail="로그인 실패")
 
+    # 요청할 레벨 목록
+    levels = list(range(10, 28))  # 10~27레벨
+
+    # 진행 상황 추적기 설정
+    progress_tracker = {"total": len(levels), "completed": 0}
+
+    # 병렬 요청 수행
     async with aiohttp.ClientSession(cookies=session.cookies) as async_session:
-        levels = list(range(10, 28))
-        progress_tracker = {"total": len(levels), "completed": 0}
         tasks = [fetch_song_details_for_level(async_session, level, progress_tracker) for level in levels]
         results = await asyncio.gather(*tasks)
 
-    # 결과를 레벨별로 매핑
+    # 레벨별 결과 매핑
     return {f"level_{level}": data for level, data in zip(levels, results)}
 
 

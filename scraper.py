@@ -1,5 +1,6 @@
 import asyncio
 import aiohttp
+import cachetools
 from bs4 import BeautifulSoup
 from fastapi import HTTPException
 
@@ -152,26 +153,39 @@ def fetch_all_levels_data(session, base_url):
 
 
 # 동시 요청 제한을 위한 Semaphore 설정
-SEMAPHORE = asyncio.Semaphore(5)  # 최대 5개의 요청만 동시 처리
+SEMAPHORE = asyncio.Semaphore(3)  # 최대 3개의 요청만 동시 처리
+
+# TTL 캐시 설정 (최대 100개, 300초 유지)
+cache = cachetools.TTLCache(maxsize=100, ttl=300)
 
 
-async def fetch_page_with_limit(session, url):
+async def fetch_page_with_retry(session, url, retries=3):
     """
-    동시 요청 제한을 적용하여 페이지 데이터를 가져옵니다.
+    재시도 기능이 포함된 페이지 데이터 요청 함수.
     """
-    async with SEMAPHORE:  # Semaphore로 동시 요청 수 제한
+    for attempt in range(retries):
         try:
-            async with session.get(url, timeout=30) as response:
-                response.raise_for_status()
-                return await response.text()
+            async with SEMAPHORE:  # 동시 요청 제한 적용
+                async with session.get(url, timeout=60) as response:
+                    response.raise_for_status()
+                    return await response.text()
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"요청 실패: {str(e)}")
+            print(f"[ERROR] 요청 실패 (재시도 {attempt + 1}/{retries}): {str(e)}")
+            if attempt == retries - 1:  # 마지막 재시도 실패 시 예외 처리
+                raise HTTPException(status_code=500, detail=f"최종 요청 실패: {str(e)}")
+            await asyncio.sleep(2)  # 재시도 대기 시간 (2초)
 
 
 async def fetch_song_details_for_level(session, level, progress_tracker):
     """
     특정 레벨의 곡 데이터를 수집합니다.
     """
+
+    # 캐시 확인
+    if level in cache:
+        print(f"[INFO] Level {level} 캐시에서 데이터 반환")
+        return cache[level]
+
     base_url = "https://www.piugame.com/my_page/my_best_score.php"
     song_data = {"single": [], "double": []}
     page = 1
@@ -179,7 +193,7 @@ async def fetch_song_details_for_level(session, level, progress_tracker):
     while True:
         try:
             url = f"{base_url}?lv={level}&page={page}"
-            html = await fetch_page_with_limit(session, url)  # 동시 요청 제한 적용
+            html = await fetch_page_with_retry(session, url)  # 동시 요청 제한 / 재시도 기능 적용
             soup = BeautifulSoup(html, "html.parser")
 
             # 곡 데이터 추출
@@ -198,8 +212,8 @@ async def fetch_song_details_for_level(session, level, progress_tracker):
                 score_element = song.select_one(".txt_v .num")
                 score = int(score_element.text.replace(",", "")) if score_element else 0
 
-                # NN.N 형식으로 변환 (수정된 부분)
-                formatted_score = f"{score / 10000:.1f}"  # 점수를 NN.N 형태로 변환
+                # NN.N 형식으로 변환
+                formatted_score = round(score / 10000, 1)
 
                 # 싱글/더블 구분
                 type_element = song.select_one(".stepBall_img_wrap .tw img")
@@ -230,6 +244,8 @@ async def fetch_song_details_for_level(session, level, progress_tracker):
     progress_tracker["completed"] += 1
     print(f"[INFO] Level {level} 완료. 진행률: {progress_tracker['completed']}/{progress_tracker['total']}")
 
+    # 캐시 저장
+    cache[level] = song_data
     return song_data
 
 

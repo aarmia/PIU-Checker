@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from scraper import fetch_song_details_for_all_levels
-from api.services.db import get_image_url_from_db
+from api.services.db import get_image_url
 
 
 router = APIRouter()
@@ -23,7 +23,7 @@ async def fetch_song_details(credentials: UserCredentials):
                 for song in data[mode]:
                     song_name = song["name"]
                     # DB에서 이미지 URL 조회 후 추가
-                    song["image_url"] = get_image_url_from_db(song_name)
+                    song["image_url"] = get_image_url(song_name)
 
         return {"status": "success", "data": song_data}
     except Exception as e:

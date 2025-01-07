@@ -1,6 +1,10 @@
 import psycopg2
 from psycopg2 import sql
+from cachetools import TTLCache
 from fastapi import HTTPException
+
+# 캐시 설정 (5분 TTL, 최대 1000개)
+image_cache = TTLCache(maxsize=1000, ttl=600)
 
 # 데이터베이스 연결 설정
 def get_db_connection():
@@ -13,27 +17,36 @@ def get_db_connection():
     )
 
 # 이미지 URL 조회
-def get_image_url_from_db(song_name: str) -> str:
-    """
-    곡 이름으로 이미지 URL 조회
-    """
+# DB에서 모든 곡 이미지 로드 (초기 캐싱)
+
+
+def load_all_image_urls():
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        query = sql.SQL("SELECT image_url FROM song_images WHERE song = %s")
-        cursor.execute(query, (song_name,))
-        result = cursor.fetchone()
+        query = "SELECT song, image_url FROM song_images"
+        cursor.execute(query)
+
+        # 결과를 캐싱
+        for song_id, image_url in cursor.fetchall():
+            image_cache[song_id] = image_url
+        print(f"캐싱 완료: {len(image_cache)} 개 항목 로드됨.")
 
         cursor.close()
         conn.close()
-
-        if result:
-            return result[0]
-        else:
-            return "https://www.piugame.com/data/song_img/44b05993485fdf84f9503d7635461185.png"  # 기본 이미지 URL
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# 곡 이미지 URL 조회 (캐시 우선)
+def get_image_url(song_id: str) -> str:
+    if song_id in image_cache:
+        return image_cache[song_id]
+    else:
+        # 캐시에 없으면 기본 이미지 반환
+        return "https://www.piugame.com/data/song_img/44b05993485fdf84f9503d7635461185.png"
+
 
 # 이미지 URL 추가 또는 업데이트
 def upsert_image_url(song_name: str, image_url: str):

@@ -158,7 +158,14 @@ SEMAPHORE = asyncio.Semaphore(3)  # 최대 3개의 요청만 동시 처리
 # TTL 캐시 설정 (최대 100개, 300초 유지)
 cache = cachetools.TTLCache(maxsize=100, ttl=300)
 
-
+# 데이터베이스 설정
+DB_CONFIG = {
+    "dbname": "piu_checker",
+    "user": "postgres",
+    "password": "1234",
+    "host": "localhost",
+    "port": 5432
+}
 async def fetch_page_with_retry(session, url, retries=3):
     """
     재시도 기능이 포함된 페이지 데이터 요청 함수.

@@ -12,7 +12,7 @@ def fetch_page_content(url, cookies=None):
     페이지의 HTML 콘텐츠를 가져오는 함수
     """
     import requests
-    response = requests.get(url, cookies=cookies, verify=False, timeout=30)
+    response = requests.get(url, cookies=cookies, verify=True, timeout=30)
     response.raise_for_status()
     response.encoding = 'utf-8'
     return response.text
@@ -57,7 +57,7 @@ def fetch_all_levels_data(session, base_url):
     # Step 1: Fetch "ALL" data from /fetch-user-data
     all_url = f"{base_url}"  # 중복 제거
     try:
-        all_response = session.get(all_url, verify=False, timeout=30)
+        all_response = session.get(all_url, verify=True, timeout=30)
         all_response.raise_for_status()
         all_soup = BeautifulSoup(all_response.text, 'html.parser')
 
@@ -105,7 +105,7 @@ def fetch_all_levels_data(session, base_url):
     for level in levels:
         try:
             url = f"{base_url}?lv={level}" if level != "27over" else f"{base_url}?lv=27over"
-            response = session.get(url, verify=False, timeout=30)
+            response = session.get(url, verify=True, timeout=30)
             response.raise_for_status()
             soup = BeautifulSoup(response.text, 'html.parser')
 
@@ -156,9 +156,16 @@ def fetch_all_levels_data(session, base_url):
 SEMAPHORE = asyncio.Semaphore(3)  # 최대 3개의 요청만 동시 처리
 
 # TTL 캐시 설정 (최대 100개, 300초 유지)
-cache = cachetools.TTLCache(maxsize=100, ttl=300)
+cache = cachetools.TTLCache(maxsize=500, ttl=300)
 
-
+# 데이터베이스 설정
+DB_CONFIG = {
+    "dbname": "piu_checker",
+    "user": "postgres",
+    "password": "1234",
+    "host": "localhost",
+    "port": 5432
+}
 async def fetch_page_with_retry(session, url, retries=3):
     """
     재시도 기능이 포함된 페이지 데이터 요청 함수.
@@ -420,7 +427,7 @@ def fetch_all_user_data(username: str, password: str):
 
         # 사용자 기본 데이터
         target_url = "https://www.piugame.com/my_page/play_data.php"
-        response = session.get(target_url, verify=False, timeout=30)
+        response = session.get(target_url, verify=True, timeout=30)
         response.encoding = 'utf-8'
         user_data = parse_user_data(response.text)
 
@@ -430,12 +437,12 @@ def fetch_all_user_data(username: str, password: str):
 
         # Pumbility 데이터
         pumbility_url = "https://www.piugame.com/my_page/pumbility.php"
-        response = session.get(pumbility_url, verify=False, timeout=30)
+        response = session.get(pumbility_url, verify=True, timeout=30)
         pumbility_data = extract_pumbility_score_and_songs(response.text)
 
         # 최근 플레이 기록 데이터
         recently_played_url = "https://www.piugame.com/my_page/recently_played.php"
-        response = session.get(recently_played_url, verify=False, timeout=30)
+        response = session.get(recently_played_url, verify=True, timeout=30)
         recently_played_data = fetch_recently_played_data(response.text)
 
         # 결과 병합

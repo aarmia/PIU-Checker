@@ -3,8 +3,8 @@ from psycopg2 import sql
 from cachetools import TTLCache
 from fastapi import HTTPException
 
-# 캐시 설정 (5분 TTL, 최대 1000개)
-image_cache = TTLCache(maxsize=1000, ttl=600)
+# 캐시 설정 (30분 TTL, 최대 1000개)
+image_cache = TTLCache(maxsize=1000, ttl=3600)
 
 # 데이터베이스 연결 설정
 def get_db_connection():
@@ -43,9 +43,28 @@ def load_all_image_urls():
 def get_image_url(song_id: str) -> str:
     if song_id in image_cache:
         return image_cache[song_id]
-    else:
-        # 캐시에 없으면 기본 이미지 반환
-        return "https://www.piugame.com/data/song_img/44b05993485fdf84f9503d7635461185.png"
+    try:
+        # 2. 캐시에 없으면 DB 조회
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        query = "SELECT image_url FROM song_images WHERE song_id = %s"
+        cursor.execute(query, (song_id,))
+        result = cursor.fetchone()
+
+        cursor.close()
+        conn.close()
+
+        # 3. 조회 성공 시 캐시에 추가
+        if result:
+            image_url = result[0]
+            image_cache[song_id] = image_url  # 캐시 업데이트
+            return image_url
+        else:
+            # 캐시에 없으면 기본 이미지 반환
+            return "https://www.piugame.com/data/song_img/44b05993485fdf84f9503d7635461185.png"
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 
 # 이미지 URL 추가 또는 업데이트

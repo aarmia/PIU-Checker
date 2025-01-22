@@ -9,9 +9,9 @@ image_cache = TTLCache(maxsize=1000, ttl=3600)
 # 데이터베이스 연결 설정
 def get_db_connection():
     return psycopg2.connect(
-        dbname="piu_checker",
-        user="postgres",
-        password="1234",
+        dbname="piu_checker",   # your database name
+        user="postgres",    # username
+        password="1234",    # pw
         host="localhost",  # 또는 서버 IP
         port="5432"
     )

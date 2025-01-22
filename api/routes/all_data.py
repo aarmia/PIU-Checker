@@ -15,11 +15,10 @@ def fetch_all_user_data_endpoint(request: Request, credentials: UserCredentials)
     client_id = request.client.host
     limit_reset = rate_limiter(client_id)
     if limit_reset:
-        return {
-            "status": "error",
-            "message": "요청 제한 초과",
-            "reset_time": str(limit_reset),
-        }
+        raise HTTPException(
+            status_code=429,
+            detail={"message": "요청 제한 초과", "reset_time": str(limit_reset)}
+        )
 
     try:
         data = fetch_all_user_data(credentials.username, credentials.password)

@@ -153,10 +153,7 @@ def fetch_all_levels_data(session, base_url):
 
 
 # 동시 요청 제한을 위한 Semaphore 설정
-SEMAPHORE = asyncio.Semaphore(3)  # 최대 3개의 요청만 동시 처리
-
-# TTL 캐시 설정 (최대 100개, 300초 유지)
-cache = cachetools.TTLCache(maxsize=500, ttl=300)
+SEMAPHORE = asyncio.Semaphore(5)  # 최대 3개의 요청만 동시 처리
 
 # 데이터베이스 설정
 DB_CONFIG = {
@@ -187,11 +184,6 @@ async def fetch_song_details_for_level(session, level, progress_tracker):
     """
     특정 레벨의 곡 데이터를 수집합니다.
     """
-
-    # 캐시 확인
-    if level in cache:
-        print(f"[INFO] Level {level} 캐시에서 데이터 반환")
-        return cache[level]
 
     base_url = "https://www.piugame.com/my_page/my_best_score.php"
     song_data = {"single": [], "double": []}
@@ -250,9 +242,6 @@ async def fetch_song_details_for_level(session, level, progress_tracker):
     # 진행 상황 메시지 추가
     progress_tracker["completed"] += 1
     print(f"[INFO] Level {level} 완료. 진행률: {progress_tracker['completed']}/{progress_tracker['total']}")
-
-    # 캐시 저장
-    cache[level] = song_data
     return song_data
 
 

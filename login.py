@@ -18,7 +18,7 @@ def login_to_piugame(username: str, password: str):
 
     try:
         # CSRF 토큰 추출
-        login_page = session.get("https://www.piugame.com/bbs/login.php", headers=headers, verify=True)
+        login_page = session.get("https://www.piugame.com/bbs/login.php", headers=headers, verify=False)
         soup = BeautifulSoup(login_page.text, 'html.parser')
         csrf_token = soup.find("input", {"name": "csrf_token"})
         csrf_value = csrf_token["value"] if csrf_token else None
@@ -34,7 +34,7 @@ def login_to_piugame(username: str, password: str):
             login_payload["csrf_token"] = csrf_value
 
         # 로그인 요청
-        response = session.post(login_url, data=login_payload, headers=headers, verify=True, timeout=30)
+        response = session.post(login_url, data=login_payload, headers=headers, verify=False, timeout=30)
 
         # 로그인 실패 처리
         if "로그인 실패" in response.text or "login" in response.url:

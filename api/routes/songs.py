@@ -1,10 +1,11 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from scraper import fetch_song_details_for_all_levels
 from api.services.db import get_image_url
-
+from api.services.limiter import rate_limiter
 
 router = APIRouter()
+
 
 class UserCredentials(BaseModel):
     username: str
@@ -12,7 +13,15 @@ class UserCredentials(BaseModel):
 
 
 @router.post("/fetch-song-details")
-async def fetch_song_details(credentials: UserCredentials):
+async def fetch_song_details(request: Request, credentials: UserCredentials):
+    client_id = request.client.host
+    limit_reset = rate_limiter(client_id)
+    if limit_reset:
+        raise HTTPException(
+            status_code=429,
+            detail={"message": "요청 제한 초과", "reset_time": str(limit_reset)}
+        )
+
     try:
         # 곡 데이터 수집
         song_data = await fetch_song_details_for_all_levels(credentials.username, credentials.password)

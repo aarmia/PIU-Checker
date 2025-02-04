@@ -4,7 +4,7 @@ from cachetools import TTLCache
 from fastapi import HTTPException
 
 # 캐시 설정 (30분 TTL, 최대 1000개)
-image_cache = TTLCache(maxsize=1000, ttl=3600)
+image_cache = TTLCache(maxsize=1000, ttl=86400)
 
 # 데이터베이스 연결 설정
 def get_db_connection():

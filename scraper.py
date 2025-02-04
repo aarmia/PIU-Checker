@@ -1,6 +1,7 @@
 import asyncio
+import re
+
 import aiohttp
-import cachetools
 from bs4 import BeautifulSoup
 from fastapi import HTTPException
 
@@ -180,11 +181,29 @@ async def fetch_page_with_retry(session, url, retries=3):
             await asyncio.sleep(2)  # 재시도 대기 시간 (2초)
 
 
+def extract_max_page(soup):
+    """
+    페이지네이션에서 마지막 페이지 번호를 추출하는 함수
+    """
+    last_page_btn = soup.select_one(".board_paging .icon i.xi.last")
+
+    if last_page_btn:
+        parent_button = last_page_btn.find_parent("button")
+        if parent_button and "onclick" in parent_button.attrs:
+            match = re.search(r"page=(\d+)", parent_button["onclick"])
+            if match:
+                return int(match.group(1))
+
+    # xi last 버튼이 존재하지 않으면 1페이지만 있다고 가정
+    return 1
+
+
 async def fetch_song_details_for_level(session, level, progress_tracker):
     """
     특정 레벨의 곡 데이터를 수집합니다.
     """
 
+    max_page = 1
     base_url = "https://www.piugame.com/my_page/my_best_score.php"
     song_data = {"single": [], "double": []}
     page = 1
@@ -194,6 +213,9 @@ async def fetch_song_details_for_level(session, level, progress_tracker):
             url = f"{base_url}?lv={level}&page={page}"
             html = await fetch_page_with_retry(session, url)  # 동시 요청 제한 / 재시도 기능 적용
             soup = BeautifulSoup(html, "html.parser")
+
+            if page == 1:
+                max_page = extract_max_page(soup)
 
             # 곡 데이터 추출
             song_items = soup.select(".my_best_scoreList li")
@@ -224,10 +246,8 @@ async def fetch_song_details_for_level(session, level, progress_tracker):
                     "score": formatted_score
                 })
 
-            # 다음 페이지 확인
-            current_page = int(soup.select_one(".board_paging .on").text.strip())
-            max_page = max(int(btn.text.strip()) for btn in soup.select(".board_paging button:not(.icon)"))
-            if current_page >= max_page:
+            if page >= max_page:
+                print(f"✅ [레벨 {level}] {max_page} 페이지 수집 완료!")
                 break
             page += 1
 

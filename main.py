@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from api.routes import router  # 모듈화된 라우트 임포트
+from api.routes import router as api_router # 모듈화된 라우트 임포트
 from api.services.db import load_all_image_urls # 캐싱 초기화 위해
 
 # JSON 응답 클래스 커스터마이징
@@ -29,7 +29,7 @@ async def startup_event():
     """
     서버 시작 시 이미지 URL 캐싱 초기화
     """
-    load_all_image_urls()  # DB에서 이미지 데이터 로드 후 캐싱
+    # load_all_image_urls()  # DB에서 이미지 데이터 로드 후 캐싱
 
 
 @app.middleware("http")
@@ -44,4 +44,4 @@ async def utf8_middleware(request, call_next):
 
 
 # API 라우터 등록
-app.include_router(router)
+app.include_router(api_router)

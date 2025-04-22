@@ -23,7 +23,7 @@
  
 ### 📌 프로젝트 설명
 
-| ![](https://github.com/aarmia/PIU-Checker/blob/master/login_page.png) | ![](https://github.com/aarmia/PIU-Checker/blob/master/home_page.png) | ![](https://github.com/aarmia/PIU-Checker/blob/master/pumbility_page.png) | ![](https://github.com/aarmia/PIU-Checker/blob/master/recent_page.png) | ![](https://github.com/aarmia/PIU-Checker/blob/master/checklist_page.png) |
+| ![](https://github.com/aarmia/PIU-Checker/blob/master/image/login_page.png) | ![](https://github.com/aarmia/PIU-Checker/blob/master/image/home_page.png) | ![](https://github.com/aarmia/PIU-Checker/blob/master/image/pumbility_page.png) | ![](https://github.com/aarmia/PIU-Checker/blob/master/image/recent_page.png) | ![](https://github.com/aarmia/PIU-Checker/blob/master/image/checklist_page.png) |
 |------------------------------------------------------------------|-----------------------------------------------------------------|----------------------------------------------------------------------|-------------------------------------------------------------------|----------------------------------------------------------------------|
 | **로그인 페이지**                                                    | **홈페이지**                                                        | **펌빌리티 페이지**                                                      | **최근 플레이 페이지**                                                | **체크리스트 페이지**                                                    |
 

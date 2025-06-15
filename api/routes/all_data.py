@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from scraper import fetch_all_user_data
 from api.services.limiter import rate_limiter
 
-router = APIRouter()
+router = APIRouter(tags=["PIU - Checker"])
 
 class UserCredentials(BaseModel):
     username: str

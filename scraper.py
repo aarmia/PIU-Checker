@@ -1,6 +1,6 @@
 import asyncio
 import re
-
+import math
 import aiohttp
 from bs4 import BeautifulSoup
 from fastapi import HTTPException
@@ -234,7 +234,7 @@ async def fetch_song_details_for_level(session, level, progress_tracker):
                 score = int(score_element.text.replace(",", "")) if score_element else 0
 
                 # NN.N 형식으로 변환
-                formatted_score = round(score / 10000, 1)
+                formatted_score = math.floor((score / 10000) * 10) / 10
 
                 # 싱글/더블 구분
                 type_element = song.select_one(".stepBall_img_wrap .tw img")

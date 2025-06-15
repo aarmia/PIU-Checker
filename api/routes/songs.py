@@ -18,7 +18,7 @@ class UserCredentials(BaseModel):
 @router.post("/fetch-song-details")
 async def fetch_song_details(request: Request, credentials: UserCredentials):
     client_id = request.client.host
-    limit_reset = rate_limiter(client_id)
+    limit_reset = rate_limiter(client_id, bucket="global")
     if limit_reset:
         raise HTTPException(
             status_code=429,
@@ -53,7 +53,7 @@ async def fetch_song_details_by_level(
     """
     # 1) Rate limiting
     client_id = request.client.host
-    limit_reset = rate_limiter(client_id)
+    limit_reset = rate_limiter(client_id, bucket="level")
     if limit_reset:
         raise HTTPException(
             status_code=429,

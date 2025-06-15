@@ -1,21 +1,41 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
+from api.services.limiter import rate_limiter
 from login import login_to_piugame
 from bs4 import BeautifulSoup
 
 router = APIRouter(tags=["Dashboard"])
 
+
 class UserCredentials(BaseModel):
     username: str
     password: str
 
+
 @router.post("/dashboard")
-async def fetch_dashboard_data(credentials: UserCredentials):
+async def fetch_dashboard_data(
+    request: Request,                    # Request 파라미터 추가
+    credentials: UserCredentials
+):
+    # 1) Rate limiting (global 버킷)
+    client_id = request.client.host
+    reset = rate_limiter(client_id, bucket="global")
+    if reset:
+        # 남은 시간 reset(TimeDelta)을 반환하므로, 적절히 문자열화하여 응답
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "message": "요청 제한 초과",
+                "retry_after_seconds": int(reset.total_seconds())
+            }
+        )
+
+    # 2) 로그인
     session = login_to_piugame(credentials.username, credentials.password)
     if not session:
         raise HTTPException(status_code=401, detail="로그인 실패")
 
-    # 랭킹 페이지 접근 및 데이터 추출
+    # 3) 랭킹 페이지 접근 및 데이터 추출
     rank_url = "https://www.piugame.com/leaderboard/pumbility_ranking.php"
     rank_html = session.get(rank_url, verify=False, timeout=30).text
     rank_soup = BeautifulSoup(rank_html, "html.parser")
@@ -40,7 +60,7 @@ async def fetch_dashboard_data(credentials: UserCredentials):
         "pumbility_score": pumbility_score
     }
 
-    # 펌빌리티 페이지에서 곡 리스트 추출
+    # 4) 펌빌리티 페이지에서 곡 리스트 추출
     pumbility_url = "https://www.piugame.com/my_page/pumbility.php"
     pumbility_html = session.get(pumbility_url, verify=False, timeout=30).text
     soup = BeautifulSoup(pumbility_html, "html.parser")
@@ -77,6 +97,7 @@ async def fetch_dashboard_data(credentials: UserCredentials):
     top10 = full_song_list[:10]
     other40 = full_song_list[10:]
 
+    # 5) 최종 응답
     return {
         "info": info,
         "TOP10": top10,

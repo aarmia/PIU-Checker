@@ -13,7 +13,7 @@ class UserCredentials(BaseModel):
 @router.post("/fetch-all-user-data")
 def fetch_all_user_data_endpoint(request: Request, credentials: UserCredentials):
     client_id = request.client.host
-    limit_reset = rate_limiter(client_id)
+    limit_reset = rate_limiter(client_id, bucket="global")
     if limit_reset:
         raise HTTPException(
             status_code=429,

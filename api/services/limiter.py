@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 
-RATE_LIMIT = 8
+RATE_LIMIT = 30
 user_request_log = {}
 
 

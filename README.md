@@ -31,6 +31,8 @@
 - - - 
 ## PIU-Checker Dashboard
 > Pump it up 유저 플레이 데이터 레이팅 시각화 웹 페이지
+> 
+> https://piu-dashboard.flutterflow.app/
 
 
 ### 👨‍🏫 프로젝트 소개

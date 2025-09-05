@@ -46,7 +46,7 @@
 
 ### 📌 프로젝트 설명
 
-| ![]() | ![]() |
+| ![](https://github.com/aarmia/PIU-Checker/blob/master/image/Dashboard_web.png) | ![](https://github.com/aarmia/PIU-Checker/blob/master/image/Dashboard_mobileview.jpg) |
 |------------------------------------------------------------------|-----------------------------------------------------------------|
 | **Web View**                                                    | **Mobile View**                                                        |
 

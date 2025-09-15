@@ -86,6 +86,10 @@ Checkers
        └─ __init__.py
 ```             
 
+### 📐 아키텍쳐 구조
+- - -
+![](https://github.com/aarmia/PIU-Checker/blob/master/image/piucheckers.drawio.png)
+
 ### 💻 개발 환경 
 - - -
 - 개발 기간
